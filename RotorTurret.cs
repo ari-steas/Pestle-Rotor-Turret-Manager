@@ -74,7 +74,21 @@ namespace IngameScript
                 if (!AzimuthRotor.IsWorking || AzimuthRotor.Closed)
                     return;
 
-                var checkWep = AllWeapons.FirstOrDefault(b => !b.Closed);
+                IMyTerminalBlock checkWep = null;
+                float checkRange = -1;
+                foreach (var wep in AllWeapons)
+                {
+                    if (!wep.IsWorking || wep.Closed)
+                        continue;
+                    var range = WcApi.GetMaxWeaponRange(wep, 0);
+                    if (checkWep != null && !(range > checkRange))
+                        continue;
+
+                    checkWep = wep;
+                }
+                    
+
+
                 MatrixD wepMatrix;
                 if (checkWep == null || !GetWeaponMatrix(out wepMatrix))
                 {
@@ -131,7 +145,7 @@ namespace IngameScript
 
                 // Weapon firing
                 {
-                    var maxWepRange = WcApi.GetMaxWeaponRange(checkWep, 0);
+                    var maxWepRange = Settings.RangeOverride < 0 ? checkRange : Settings.RangeOverride;
                     targetBounds.Centerize(targetLeadPos ?? Vector3D.Zero);
                     #if DEBUG
                     DebugApi.DrawAABB(targetBounds, Color.Red);
