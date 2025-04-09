@@ -82,8 +82,10 @@ namespace IngameScript
             var gridTarget = WcApi.GetAiFocus(Me.CubeGrid.EntityId);
             var wepTargets = TargetSourceTurrets.Select(w => WcApi.GetWeaponTarget(w)).ToList();
 
-            //DebugApi.PrintHUD($"GridTarget: {gridTarget?.EntityId ?? 0}", seconds: 1 / 60f);
-            //DebugApi.PrintHUD($"WepTargets: {string.Join(",", wepTargets.Select(t => t?.EntityId ?? -1))}", seconds: 1 / 60f);
+            #if DEBUG
+            DebugApi.PrintHUD($"GridTarget: {gridTarget?.EntityId ?? 0}", seconds: 1 / 60f);
+            DebugApi.PrintHUD($"WepTargets: {string.Join(",", wepTargets.Select(t => t?.EntityId ?? -1))}", seconds: 1 / 60f);
+            #endif
 
             foreach (var turret in RotorTurrets)
                 turret.Update(gridTarget, wepTargets);
