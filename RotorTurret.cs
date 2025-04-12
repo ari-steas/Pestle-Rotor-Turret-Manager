@@ -85,6 +85,7 @@ namespace IngameScript
                         continue;
 
                     checkWep = wep;
+                    checkRange = range;
                 }
                     
 
@@ -105,14 +106,18 @@ namespace IngameScript
                     if (gridTarget != null && gridTarget.Value.EntityId != 0)
                     {
                         var leadPos = WcApi.GetPredictedTargetPosition(checkWep, gridTarget.Value.EntityId, 0);
+                        var canAim = CanAimAt(leadPos, wepMatrix);
 
-                        if (CanAimAt(leadPos, wepMatrix))
+                        if (canAim)
                         {
                             targetLeadPos = leadPos;
                             targetBounds = gridTarget.Value.BoundingBox;
                             targetBounds = targetBounds.Inflate(targetBounds.Size * I.GridAimTolerance - targetBounds.Size);
                         }
-                        //DebugApi.PrintHUD("Check Grid Target", seconds: 1 / 60f);
+
+                        #if DEBUG
+                        DebugApi.PrintHUD($"{(canAim ? "Use" : "Skip")} Grid Target", seconds: 1 / 60f);
+                        #endif
                     }
                     
                     if (!Settings.PreferGridTarget || targetLeadPos == null)
@@ -132,7 +137,7 @@ namespace IngameScript
 
                 #if DEBUG
                 if (targetLeadPos != null)
-                    DebugApi.DrawLine(wepMatrix.Translation, targetLeadPos.Value, Color.Red);
+                    DebugApi.DrawPoint(targetLeadPos.Value, Color.Red, 2);
                 #endif
 
 
@@ -147,27 +152,35 @@ namespace IngameScript
                 {
                     var maxWepRange = Settings.RangeOverride < 0 ? checkRange : Settings.RangeOverride;
                     targetBounds.Centerize(targetLeadPos ?? Vector3D.Zero);
+                    bool anyCanHit = false;
                     #if DEBUG
                     DebugApi.DrawAABB(targetBounds, Color.Red);
+                    DebugApi.PrintHUD($"Max Range: {maxWepRange:N0}", seconds: 1/60f);
                     #endif
 
-                    var newFwd = Vector3D.Zero;
-                    int ct = 0;
                     foreach (var weapon in AllWeapons)
                     {
                         if (weapon.Closed)
                             continue;
 
-                        newFwd += WcApi.GetWeaponScope(weapon, 0).Item2;
-                        ct++;
+                        var scope = WcApi.GetWeaponScope(weapon, 0);
+
+                        if (!anyCanHit)
+                            anyCanHit = (targetBounds.Intersects(new Ray(scope.Item1, scope.Item2)) ?? double.MaxValue) < maxWepRange;
+
+                        #if DEBUG
+                        DebugApi.DrawLine(scope.Item1, scope.Item1 + scope.Item2 * WcApi.GetMaxWeaponRange(weapon, 0),
+                            anyCanHit ? Color.Red : Color.White);
+                        #else
+                        if (anyCanHit)
+                            break;
+                        #endif
                     }
 
-                    wepMatrix.Forward = Vector3D.Normalize(newFwd / ct);
-
-                    if (targetLeadPos != null && (targetBounds.Intersects(new Ray(wepMatrix.Translation, wepMatrix.Forward)) ?? double.MaxValue) < maxWepRange)
+                    if (targetLeadPos != null && anyCanHit)
                     {
                         foreach (var weapon in AllWeapons)
-                            Utils.FireWeapon(weapon, true);
+                            Utils.FireWeapon(weapon, WcApi.IsWeaponReadyToFire(weapon));
                     }
                     else
                     {
@@ -176,14 +189,14 @@ namespace IngameScript
                     }
                 }
 
-                #if DEBUG
-                DebugApi.PrintHUD(
-                    $"Azi: {MathHelper.ToDegrees(AzimuthRotor.Angle):F0} Elev: {MathHelper.ToDegrees(WeaponElevationMap.Keys.First().Angle):F0}",
-                    seconds: 1 / 60f);
-                DebugApi.PrintHUD(
-                    $"DAzi: {MathHelper.ToDegrees(DesiredAzimuth):F0} DElev: {MathHelper.ToDegrees(DesiredElevation):F0}",
-                    seconds: 1 / 60f);
-                #endif
+                //#if DEBUG
+                //DebugApi.PrintHUD(
+                //    $"Azi: {MathHelper.ToDegrees(AzimuthRotor.Angle):F0} Elev: {MathHelper.ToDegrees(WeaponElevationMap.Keys.First().Angle):F0}",
+                //    seconds: 1 / 60f);
+                //DebugApi.PrintHUD(
+                //    $"DAzi: {MathHelper.ToDegrees(DesiredAzimuth):F0} DElev: {MathHelper.ToDegrees(DesiredElevation):F0}",
+                //    seconds: 1 / 60f);
+                //#endif
             }
 
             private void ResetVelocity()
@@ -251,24 +264,38 @@ namespace IngameScript
                 if (position == null)
                     return false;
 
-                var minAzi = AzimuthRotor.LowerLimitRad == float.MinValue ? float.MinValue : Utils.NormalizeAngle(AzimuthRotor.LowerLimitRad);
-                var maxAzi = AzimuthRotor.UpperLimitRad == float.MaxValue ? float.MaxValue : Utils.NormalizeAngle(AzimuthRotor.UpperLimitRad);
+                var minAzi = AzimuthRotor.LowerLimitRad <= Math.PI ? float.MinValue : Utils.NormalizeAngle(AzimuthRotor.LowerLimitRad);
+                var maxAzi = AzimuthRotor.UpperLimitRad >= Math.PI ? float.MaxValue : Utils.NormalizeAngle(AzimuthRotor.UpperLimitRad);
                 var aziAngle = Utils.NormalizeAngle(AzimuthRotor.Angle - Utils.GetAziAngleToTarget(wepMatrix, position, 0));
-                
+
                 if (aziAngle < minAzi ||
                     aziAngle > maxAzi)
+                {
+                    #if DEBUG
+                    DebugApi.DrawLine(wepMatrix.Translation, position.Value, Color.Red, 0.01f);
+                    #endif
                     return false;
+                }
 
                 foreach (var eleRotor in WeaponElevationMap.Keys)
                 {
-                    var minEle = eleRotor.LowerLimitRad == float.MinValue ? float.MinValue : Utils.NormalizeAngle(eleRotor.LowerLimitRad);
-                    var maxEle = eleRotor.UpperLimitRad == float.MaxValue ? float.MaxValue : Utils.NormalizeAngle(eleRotor.UpperLimitRad);
+                    var minEle = eleRotor.LowerLimitRad <= Math.PI ? float.MinValue : Utils.NormalizeAngle(eleRotor.LowerLimitRad);
+                    var maxEle = eleRotor.UpperLimitRad >= Math.PI ? float.MaxValue : Utils.NormalizeAngle(eleRotor.UpperLimitRad);
                     var eleAngle = Utils.NormalizeAngle(eleRotor.Angle - Utils.GetAziAngleToTarget(_weaponPosCache[eleRotor], position, 0));
 
                     if (eleAngle >= minEle &&
                         eleAngle <= maxEle)
+                    {
+                        #if DEBUG
+                        DebugApi.DrawLine(wepMatrix.Translation, position.Value, Color.Green, 0.01f);
+                        #endif
                         return true;
+                    }
                 }
+
+                #if DEBUG
+                DebugApi.DrawLine(wepMatrix.Translation, position.Value, Color.Orange, 0.01f);
+                #endif
 
                 return false;
             }

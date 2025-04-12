@@ -35,6 +35,7 @@ namespace IngameScript
             private Func<IMyTerminalBlock, long, int, Vector3D?> _getPredictedTargetPos;
             private Func<IMyTerminalBlock, bool> _hasCoreWeapon;
             private Func<IMyTerminalBlock, int, MyTuple<Vector3D, Vector3D>> _getWeaponScope;
+            private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, int, bool, bool, bool> _isWeaponReadyToFire;
 
             // Descriptions made by Aristeas, with Sigmund Froid's https://steamcommunity.com/sharedfiles/filedetails/?id=2178802013 as a reference.
             // PR accepted after prolific begging by Aryx
@@ -77,6 +78,7 @@ namespace IngameScript
                 AssignMethod(delegates, "GetPredictedTargetPosition", ref _getPredictedTargetPos);
                 AssignMethod(delegates, "HasCoreWeapon", ref _hasCoreWeapon);
                 AssignMethod(delegates, "GetWeaponScope", ref _getWeaponScope);
+                AssignMethod(delegates, "IsWeaponReadyToFire", ref _isWeaponReadyToFire);
 
                 return true;
             }
@@ -197,6 +199,22 @@ namespace IngameScript
             /// </returns>
             public MyTuple<Vector3D, Vector3D> GetWeaponScope(IMyTerminalBlock weapon, int weaponId) =>
                 _getWeaponScope?.Invoke(weapon, weaponId) ?? new MyTuple<Vector3D, Vector3D>();
+
+            /// <summary>
+            /// Returns whether or not <paramref name="weaponId"/> on <paramref name="weapon"/> is ready to fire.
+            /// </summary>
+            /// <remarks>
+            /// <paramref name="anyWeaponReady"/> uses all weapons on <paramref name="weapon"/>.
+            /// </remarks>
+            /// <param name="weapon"></param>
+            /// <param name="weaponId"></param>
+            /// <param name="anyWeaponReady"></param>
+            /// <param name="shootReady"></param>
+            /// <returns><see cref="true"/> if ready to fire, <see cref="false"/> otherwise.</returns>
+            public bool IsWeaponReadyToFire(Sandbox.ModAPI.Ingame.IMyTerminalBlock weapon, int weaponId = 0, bool anyWeaponReady = true,
+                bool shootReady = false) =>
+                _isWeaponReadyToFire?.Invoke(weapon, weaponId, anyWeaponReady, shootReady) ?? false;
+
         }
     }
 }
