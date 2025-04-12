@@ -73,12 +73,15 @@ namespace IngameScript
             {
                 if (!AzimuthRotor.IsWorking || AzimuthRotor.Closed)
                     return;
+                RemoveClosed(AllWeapons);
+                foreach (var map in WeaponElevationMap.Values)
+                    RemoveClosed(map);
 
                 IMyTerminalBlock checkWep = null;
                 float checkRange = -1;
                 foreach (var wep in AllWeapons)
                 {
-                    if (!wep.IsWorking || wep.Closed)
+                    if (!wep.IsWorking)
                         continue;
                     var range = WcApi.GetMaxWeaponRange(wep, 0);
                     if (checkWep != null && !(range > checkRange))
@@ -160,7 +163,7 @@ namespace IngameScript
 
                     foreach (var weapon in AllWeapons)
                     {
-                        if (weapon.Closed)
+                        if (!weapon.IsWorking)
                             continue;
 
                         var scope = WcApi.GetWeaponScope(weapon, 0);
@@ -215,6 +218,15 @@ namespace IngameScript
                     block.CustomName = $"[{Id}] {block.CustomName}";
             }
 
+            private void RemoveClosed(List<IMyTerminalBlock> blocks)
+            {
+                for (int i = blocks.Count - 1; i >= 0; i--)
+                {
+                    if (blocks[i].Closed)
+                        blocks.RemoveAt(i);
+                }
+            }
+
             private bool GetWeaponMatrix(out MatrixD matrix)
             {
                 matrix = MatrixD.Identity;
@@ -231,7 +243,7 @@ namespace IngameScript
 
                     foreach (var wep in elev.Value)
                     {
-                        if (wep.Closed || !wep.IsWorking)
+                        if (!wep.IsWorking)
                             continue;
                         var scopeSet = WcApi.GetWeaponScope(wep, 0);
                         position += scopeSet.Item1;
