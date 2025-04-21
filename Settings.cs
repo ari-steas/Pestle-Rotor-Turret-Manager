@@ -31,6 +31,16 @@ namespace IngameScript
             "Multiplier for block aim tolerance; based on block WorldAABB.",
             3);
 
+        public static IniSetting<float> DefaultHomeAzimuth = new IniSetting<float>(
+            "DefaultHomeAzimuth",
+            "Global default home position for turrets. Per-turret settings take priority.",
+            0);
+
+        public static IniSetting<float> DefaultHomeElevation = new IniSetting<float>(
+            "DefaultHomeElevation",
+            "Global default home position for turrets. Per-turret settings take priority.",
+            0);
+
         public const string IgnoreBlockTag = "[PestleIgnore]";
 
         public static Dictionary<char, Program.RotorTurretSettings> Read()

@@ -24,13 +24,17 @@ namespace IngameScript
     {
         public class RotorTurretSettings
         {
-            public readonly float HomeAzimuth, HomeElevation, RangeOverride, AziSpeed, EleSpeed;
+            private readonly float _homeAzimuth, _homeElevation;
+            public readonly float RangeOverride, AziSpeed, EleSpeed;
+            public float HomeAzimuth => _homeAzimuth == -1 ? Settings.DefaultHomeAzimuth : _homeAzimuth;
+            public float HomeElevation => _homeElevation == -1 ? Settings.DefaultHomeElevation : _homeElevation;
+
             public bool PreferGridTarget;
 
             public RotorTurretSettings()
             {
-                HomeAzimuth = 0;
-                HomeElevation = 0;
+                _homeAzimuth = -1;
+                _homeElevation = -1;
                 PreferGridTarget = false;
                 RangeOverride = -1;
                 AziSpeed = 1; 
@@ -39,8 +43,8 @@ namespace IngameScript
 
             public RotorTurretSettings(string section, MyIni ini) : this()
             {
-                HomeAzimuth = ini.Get(section, "HomeAzimuth").ToSingle(HomeAzimuth);
-                HomeElevation = ini.Get(section, "HomeElevation").ToSingle(HomeElevation);
+                _homeAzimuth = ini.Get(section, "HomeAzimuth").ToSingle(_homeAzimuth);
+                _homeElevation = ini.Get(section, "HomeElevation").ToSingle(_homeElevation);
                 PreferGridTarget = ini.Get(section, "PreferGridTarget").ToBoolean(PreferGridTarget);
                 RangeOverride = ini.Get(section, "RangeOverride").ToSingle(RangeOverride);
                 AziSpeed = ini.Get(section, "AziSpeed").ToSingle(AziSpeed);
@@ -51,8 +55,8 @@ namespace IngameScript
             {
                 var section = id + "";
                 ini.AddSection(section);
-                ini.Set(section, "HomeAzimuth", HomeAzimuth);
-                ini.Set(section, "HomeElevation", HomeElevation);
+                ini.Set(section, "HomeAzimuth", _homeAzimuth);
+                ini.Set(section, "HomeElevation", _homeElevation);
                 ini.Set(section, "PreferGridTarget", PreferGridTarget);
                 ini.Set(section, "RangeOverride", RangeOverride);
                 ini.Set(section, "AziSpeed", AziSpeed);
