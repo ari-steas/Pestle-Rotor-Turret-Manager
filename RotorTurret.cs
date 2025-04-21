@@ -35,12 +35,18 @@ namespace IngameScript
             private Dictionary<IMyMotorStator, MatrixD> _weaponPosCache;
 
             public RotorTurret(char suggestedId, IMyMotorStator aziRotor, List<IMyMotorStator> eleRotors,
-                Dictionary<IMyCubeGrid, List<IMyTerminalBlock>> allTopParts)
+                Dictionary<IMyCubeGrid, List<IMyTerminalBlock>> allTopParts, ICollection<char> usedIds)
             {
                 AzimuthRotor = aziRotor;
                 Id = suggestedId;
                 if (aziRotor.CustomName.Length >= 3 && aziRotor.CustomName[0] == '[' && aziRotor.CustomName[2] == ']')
-                    Id = char.ToUpper(aziRotor.CustomName[1]);
+                {
+                    var newId = char.ToUpper(aziRotor.CustomName[1]);
+                    if (usedIds.All(id => id != newId))
+                        Id = newId;
+                    else
+                        aziRotor.CustomName = $"[{Id}]{aziRotor.CustomName.Substring(3)}";
+                }
                 else
                     aziRotor.CustomName = $"[{Id}] {aziRotor.CustomName}";
 
@@ -354,7 +360,7 @@ namespace IngameScript
                 char suggestedId = 'A';
                 foreach (var rotorSet in turretSubgrids)
                 {
-                    var turret = new RotorTurret(suggestedId, rotorSet.Key, rotorSet.Value, topSubparts);
+                    var turret = new RotorTurret(suggestedId, rotorSet.Key, rotorSet.Value, topSubparts, toReturn.Keys);
                     toReturn[turret.Id] = turret;
 
                     if (suggestedId == turret.Id)
