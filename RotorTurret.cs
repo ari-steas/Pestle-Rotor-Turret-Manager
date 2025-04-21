@@ -25,7 +25,7 @@ namespace IngameScript
         public class RotorTurret
         {
             public char Id;
-            public RotorTurretSettings Settings;
+            public RotorTurretSettings TurretSettings;
 
             public IMyMotorStator AzimuthRotor;
             public Dictionary<IMyMotorStator, List<IMyTerminalBlock>> WeaponElevationMap;
@@ -64,15 +64,15 @@ namespace IngameScript
                     _weaponPosCache[eleRotor] = MatrixD.Identity;
                 }
 
-                if (!I.Settings.TryGetValue(Id, out Settings))
+                if (!I.AllTurretSettings.TryGetValue(Id, out TurretSettings))
                 {
-                    Settings = new RotorTurretSettings();
-                    I.Settings[Id] = Settings;
+                    TurretSettings = new RotorTurretSettings();
+                    I.AllTurretSettings[Id] = TurretSettings;
                 }
 
                 ResetVelocity();
-                DesiredAzimuth = MathHelper.ToRadians(Settings.HomeAzimuth);
-                DesiredElevation = MathHelper.ToRadians(Settings.HomeElevation);
+                DesiredAzimuth = MathHelper.ToRadians(TurretSettings.HomeAzimuth);
+                DesiredElevation = MathHelper.ToRadians(TurretSettings.HomeElevation);
             }
 
             public void Update(MyDetectedEntityInfo? gridTarget, IEnumerable<MyDetectedEntityInfo?> weaponTargets)
@@ -112,7 +112,7 @@ namespace IngameScript
 
                 // Target info
                 {
-                    if (gridTarget != null && gridTarget.Value.EntityId != 0)
+                    if (gridTarget != null && gridTarget.Value.EntityId != 0 && Settings.UseGridTarget)
                     {
                         var leadPos = WcApi.GetPredictedTargetPosition(checkWep, gridTarget.Value.EntityId, 0);
                         var canAim = CanAimAt(leadPos, wepMatrix);
@@ -121,7 +121,7 @@ namespace IngameScript
                         {
                             targetLeadPos = leadPos;
                             targetBounds = gridTarget.Value.BoundingBox;
-                            targetBounds = targetBounds.Inflate(targetBounds.Size * I.GridAimTolerance - targetBounds.Size);
+                            targetBounds = targetBounds.Inflate(targetBounds.Size * Settings.GridAimTolerance - targetBounds.Size);
                         }
 
                         #if DEBUG
@@ -129,7 +129,7 @@ namespace IngameScript
                         #endif
                     }
                     
-                    if (!Settings.PreferGridTarget || targetLeadPos == null)
+                    if (!TurretSettings.PreferGridTarget || targetLeadPos == null)
                     {
                         var wepTarget = weaponTargets.FirstOrDefault(t => (t?.EntityId ?? 0) != 0 && CanAimAt(I.GetBlockLeadPos(t.Value, checkWep), wepMatrix));
                         
@@ -139,7 +139,7 @@ namespace IngameScript
                         {
                             targetLeadPos = (wepTarget?.EntityId ?? 0) == 0 ? null : I.GetBlockLeadPos(wepTarget.Value, checkWep);
                             targetBounds = wepTarget?.BoundingBox ?? default(BoundingBoxD);
-                            targetBounds = targetBounds.Inflate(targetBounds.Size * I.BlockAimTolerance - targetBounds.Size);
+                            targetBounds = targetBounds.Inflate(targetBounds.Size * Settings.BlockAimTolerance - targetBounds.Size);
                         }
                     }
                 }
@@ -151,15 +151,15 @@ namespace IngameScript
 
 
                 // Azimuth
-                Utils.AimRotor(AzimuthRotor, wepMatrix, ref DesiredAzimuth, targetLeadPos, float.MinValue, float.MaxValue, Settings.HomeAzimuth, Settings.AziSpeed);
+                Utils.AimRotor(AzimuthRotor, wepMatrix, ref DesiredAzimuth, targetLeadPos, float.MinValue, float.MaxValue, TurretSettings.HomeAzimuth, TurretSettings.AziSpeed);
 
                 // Elevation
                 foreach (var ele in WeaponElevationMap.Keys)
-                    Utils.AimRotor(ele, _weaponPosCache[ele], ref DesiredElevation, targetLeadPos, (float) -Math.PI/2, (float) Math.PI/2, Settings.HomeElevation, Settings.EleSpeed);
+                    Utils.AimRotor(ele, _weaponPosCache[ele], ref DesiredElevation, targetLeadPos, (float) -Math.PI/2, (float) Math.PI/2, TurretSettings.HomeElevation, TurretSettings.EleSpeed);
 
                 // Weapon firing
                 {
-                    var maxWepRange = Settings.RangeOverride < 0 ? checkRange : Settings.RangeOverride;
+                    var maxWepRange = TurretSettings.RangeOverride < 0 ? checkRange : TurretSettings.RangeOverride;
                     targetBounds.Centerize(targetLeadPos ?? Vector3D.Zero);
                     bool anyCanHit = false;
                     #if DEBUG
@@ -324,7 +324,7 @@ namespace IngameScript
                 var staticDefs = new List<MyDefinitionId>();
                 WcApi.GetAllCoreStaticLaunchers(staticDefs);
                 var allTurretWeps = new List<IMyTerminalBlock>();
-                I.GridTerminalSystem.GetBlocksOfType(allTurretWeps, b => b.CubeGrid != I.Me.CubeGrid && WcApi.HasCoreWeapon(b) && staticDefs.Contains(b.BlockDefinition) && !b.CustomName.StartsWith(IgnoreBlockTag));
+                I.GridTerminalSystem.GetBlocksOfType(allTurretWeps, b => b.CubeGrid != I.Me.CubeGrid && WcApi.HasCoreWeapon(b) && staticDefs.Contains(b.BlockDefinition) && !b.CustomName.StartsWith(Settings.IgnoreBlockTag));
 
                 var topSubparts = new Dictionary<IMyCubeGrid, List<IMyTerminalBlock>>();
                 foreach (var wep in allTurretWeps)
@@ -336,7 +336,7 @@ namespace IngameScript
                 }
 
                 var allRotors = new List<IMyMotorStator>();
-                I.GridTerminalSystem.GetBlocksOfType(allRotors, b => !b.CustomName.StartsWith(IgnoreBlockTag));
+                I.GridTerminalSystem.GetBlocksOfType(allRotors, b => !b.CustomName.StartsWith(Settings.IgnoreBlockTag));
                 var turretSubgrids = new Dictionary<IMyMotorStator, List<IMyMotorStator>>();
                 foreach (var grid in topSubparts.Keys)
                 {

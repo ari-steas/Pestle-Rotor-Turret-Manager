@@ -41,18 +41,15 @@ namespace IngameScript
 
         public List<RotorTurret> RotorTurrets;
         public List<IMyTerminalBlock> TargetSourceTurrets = new List<IMyTerminalBlock>();
-        public Dictionary<char, RotorTurretSettings> Settings;
+        public Dictionary<char, RotorTurretSettings> AllTurretSettings;
 
-        public bool UseGridTarget = true;
-        public string SourceWeaponGroup = "Rotor Turret Source";
-        public float GridAimTolerance = 1;
-        public float BlockAimTolerance = 3;
-        public const string IgnoreBlockTag = "[PestleIgnore]";
+        
 
         private Dictionary<long, MyDetectedEntityInfo> _threatBuffer = new Dictionary<long, MyDetectedEntityInfo>();
 
         public Program()
         {
+            Echo($"'Pestle' Rotor Turret Manager\n====================\nTime: {DateTime.Now:T}");
             I = this;
             #if DEBUG
             DebugApi = new DebugAPI(this, true);
@@ -60,14 +57,15 @@ namespace IngameScript
             if (!WcApi.Activate(Me))
                 throw new Exception("Failed to initialize WcPbApi!");
 
-            Settings = ReadSettings();
+            AllTurretSettings = Settings.Read();
             RotorTurrets = RotorTurret.InitTurrets();
-            WriteSettings();
+            Settings.Write();
 
-            if (SourceWeaponGroup != "")
-                GridTerminalSystem.GetBlockGroupWithName(SourceWeaponGroup)?.GetBlocksOfType(TargetSourceTurrets, b => WcApi.HasCoreWeapon(b) && !b.CustomName.StartsWith(IgnoreBlockTag));
+            if (Settings.SourceWeaponGroup != "")
+                GridTerminalSystem.GetBlockGroupWithName(Settings.SourceWeaponGroup)?.GetBlocksOfType(TargetSourceTurrets, b => WcApi.HasCoreWeapon(b) && !b.CustomName.StartsWith(Settings.IgnoreBlockTag));
 
             Runtime.UpdateFrequency = UpdateFrequency.Update1;
+            Echo("Ready!\n\nThis won't update while the script is running, so don't worry if it looks frozen.");
         }
 
         public void Main(string argument, UpdateType updateSource)
@@ -89,58 +87,6 @@ namespace IngameScript
 
             foreach (var turret in RotorTurrets)
                 turret.Update(gridTarget, wepTargets);
-        }
-
-        public Dictionary<char, RotorTurretSettings> ReadSettings()
-        {
-            var ini = new MyIni();
-            ini.TryParse(Me.CustomData);
-
-            var settings = new Dictionary<char, RotorTurretSettings>();
-
-            var iniSections = new List<string>();
-            ini.GetSections(iniSections);
-            foreach (var section in iniSections)
-            {
-                if (section == "General Config")
-                {
-                    UseGridTarget = ini.Get(section, "UseGridTarget").ToBoolean(UseGridTarget);
-                    SourceWeaponGroup = ini.Get(section, "SourceWeaponGroup").ToString(SourceWeaponGroup);
-                    GridAimTolerance = ini.Get(section, "GridAimTolerance").ToSingle(GridAimTolerance);
-                    BlockAimTolerance = ini.Get(section, "BlockAimTolerance").ToSingle(BlockAimTolerance);
-                }
-                else
-                    settings[section[0]] = new RotorTurretSettings(section, ini);
-            }
-
-            return settings;
-        }
-
-        public void WriteSettings()
-        {
-            var ini = new MyIni();
-            ini.AddSection("General Config");
-            ini.SetSectionComment("General Config", " 'Pestle' Rotor Turret Manager Settings\n\n Set default values for turrets tagged with that section's letter below,\n   then recompile.\n Delete a line to reset it to default.\n ");
-            
-            ini.Set("General Config", "UseGridTarget", UseGridTarget);
-            ini.SetComment("General Config", "UseGridTarget", "Should the script consider grid (scroll wheel) target?");
-
-            ini.Set("General Config", "SourceWeaponGroup", SourceWeaponGroup);
-            ini.SetComment("General Config", "SourceWeaponGroup", "Name for terminal group the script should pull targeting info from. Optional.");
-
-            ini.Set("General Config", "GridAimTolerance", GridAimTolerance);
-            ini.SetComment("General Config", "GridAimTolerance", "Multiplier for grid aim tolerance; based on grid WorldAABB.");
-
-            ini.Set("General Config", "BlockAimTolerance", BlockAimTolerance);
-            ini.SetComment("General Config", "BlockAimTolerance", "Multiplier for block aim tolerance; based on block WorldAABB.");
-
-            foreach (var turret in RotorTurrets)
-            {
-                turret.Settings.Write(turret.Id, ini);
-                ini.SetSectionComment("" + turret.Id, $" {turret.WeaponElevationMap.Count} elevation rotor(s) & {turret.WeaponElevationMap.Values.Sum(l => l.Count)} weapon(s)");
-            }
-
-            Me.CustomData = ini.ToString();
         }
 
         public Vector3D? GetBlockLeadPos(MyDetectedEntityInfo blockInfo, IMyTerminalBlock weapon)
